@@ -1,0 +1,209 @@
+---
+title: "STAT340 HW04: Models"
+date: "4/22/2022"
+author: "Kara Conrad"
+output: html_document
+---
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(tidyverse, MASS)
+library(lmvar)
+library(glmnet)
+```
+Several problems inspired by ISLR. **Problems are worth 10 points each**
+
+
+## Question 1
+Suppose we have a data set with five predictors, $X_{1}=\text{GPA}$, $X_{2}=\text{IQ}$, $X_{3}=\text{Level ( 1 for College and 0 for High School)}$, $X_{4}=\textrm{Interaction between GPA and IQ}$, and $X_{5}=\text{Interaction between GPA and Level}$. The response is starting salary after graduation (in thousands of dollars). Suppose we use least squares to fit the model, and get $\hat{\beta}_{0}=50$, $\hat{\beta}_{1}=20$, $\hat{\beta}_{2}=0.07$, $\hat{\beta}_{3}=35$, $\hat{\beta}_{4}=0.01$, $\hat{\beta}_{5}=-10$.'
+
+a. Which answer is correct, and why?
+   i. For a fixed value of IQ and GPA, high school graduates earn more, on average, than college graduates. 
+   False, because it depends on the balance between beta3•level and beta5•level•gpa and which is higher. 
+   
+   ii. For a fixed value of IQ and GPA, college graduates earn more, on average, than high school graduates. 
+   False, the reasoning is essentially the same as i, since it all comes down to how big the GPA value is.
+   
+   iii. For a fixed value of IQ and GPA, high school graduates earn more, on average, than college graduates provided that the GPA is high enough. 
+   True, because when you calculate the least squared line you will end up with an equation where the high school salary is higher than college's. If there is a high GPA value this would make the beta5 term extra negative for college students but for high school students a large GPA value would not result in a more negative beta5 term because the level (which is incorporated with the X5 term being multiplied) is zero so it will cancel out.
+   
+   iv. For a fixed value of IQ and GPA, college graduates earn more, on average, than high school graduates provided that the GPA is high enough. 
+   False, because if the GPA is too large, it will exceed a point in which the negative value from the beta5 term will decrease the response variable too much for the college student and will result in the high school student earning more.
+   
+   
+b. Predict the salary of a college graduate with IQ of 110 and a GPA of 4.0.
+```{r}
+gpa = 4
+iq = 110
+level = 1
+y = 50 + 20 * gpa + .07 * iq + 35 * level + (.01 * gpa * iq) + (-10 * gpa * level)
+y * 1000
+```
+The predicted salary of a college graduate with these X1 and X2 values is $137,100. The equation is y = beta0 + beta1•gpa + beta2•IQ + beta3•level + beta4•GPA•IQ + beta5•GPA•level and the respective values can be substituted in. 
+
+
+c. True or false: Since the coefficient for the GPA/IQ interaction term is very small, there is very little evidence of an interaction effect. Justify your answer. 
+  False, because you cannot tell by the coefficient alone. Coefficient is influenced by the scale/units of the variable. (Do a p-value estimation)
+
+
+
+## Question 2
+I collect a set of data ($n=100$ observations) containing a single predictor and a quantitative response. I then fit a linear regression model to the data, as well as a separate cubic regression, i.e. $Y=$ $\beta_{0}+\beta_{1} X+\beta_{2} X^{2}+\beta_{3} X^{3}+\epsilon$
+
+a. Suppose that the true relationship between $X$ and $Y$ is linear, i.e. $Y=\beta_{0}+\beta_{1} X+\epsilon$. Consider the training residual sum of squares (RSS) for the linear regression, and also the training RSS for the cubic regression. Would we expect one to be lower than the other, would we expect them to be the same, or is there not enough information to tell? Justify your answer.
+  We can expect the cubic regression RSS to be lower from overfitting the training set. RSS refers to the loss function which we are trying to minimize when creating regression models. Cubic models are reading in training data over actually interpreting it, leaving room for more errors.
+  
+b. Answer a. using test rather than training RSS.
+  When using tests, we expect the RSS of the cubic model to be higher than the linear model. This is because we are told the true relationship between X and Y is linear. Since the cubic model was overfit, it may appear to minimize the RSS, but not much is learned from the training data, so making predictions would not be accurate. The linear model would do a better job since it matches the true relationship and will then have a lower RSS value than the cubic model.
+
+c. Suppose that the true relationship between $X$ and $Y$ is not linear, but we don't know how far it is from linear. Consider the training RSS for the linear regression, and also the training RSS for the cubic regression. Would we expect one to be lower than the other, would we expect them to be the same, or is there not enough information to tell? Justify your answer.
+  The cubic model would minimize the RSS more than the linear model because of the flexibility with a cubic function for curvature. The true relationship being nonlinear leaving a broad scope of possible relationships (all besides data does not follow a pattern in a line). So there is likely curvature and a cubic function would obviously fit better than a straight line. So the cubic model will have a lower RSS than the linear model.
+
+d. Answer (c) using test rather than training RSS.
+  The cubic model would better minimize the RSS on prediction based testing set than the linear model. Similar to part b, the cubic model is able to learn better from the true relationship that will have some sort of curvature in it than a linear model. Because of this, it must be better at predicting than the linear model, and so we expect the cubic model would have a lower RSS.
+
+
+
+## Question 3
+Suppose we collect data for a group of students in a statistics class with variables $X_{1}=\text{hours studied}$, $X_{2}=\text{undergrad GPA}$, and $Y=\text{receive an A}$. We fit a logistic regression and produce estimated coefficient, $\hat{\beta}_{0}=-6, \hat{\beta}_{1}=0.05, \hat{\beta}_{2}=1$.
+
+a. Estimate the probability that a student who studies for $40\mathrm{h}$ and has an undergrad GPA of $3.5$ gets an A in the class.
+```{r}
+hours = 40
+gpa = 3.5
+prob = -6 + .05 * hours + 1 * gpa
+prob = 1 + exp(-prob)
+prob = 1 / prob
+
+prob
+```
+
+b. How many hours would the student in part a. need to study to have a $50\%$ chance of getting an A in the class?
+  The student must study 50 hours to have a 50% chance of getting an A in the class. Currently, y=1/ (1 + e^-(beta0 + beta1 * hours + beta2 * GPA)) where hours is our unknown and plugging in the remaining values. Because we want to achieve 50%, y is set to 0.5. We can manipulate the formula to e^(beta0 + beta1 * hours + beta2 * GPA) = 1. Taking the natural log of both sides and solving for hours, we determine needing ti study 50 hours in order to achieve a 50% chance of receiving an A with this GPA.
+
+
+
+## Question 4
+This question uses the `titanic` dataset from the `DALEX` package. This is a **real dataset** documenting which passengers on the RMS Titanic survived.
+```{r,warning=F,message=F}
+# make sure you have the DALEX package
+library(DALEX)
+
+# you should read the help page by running ?titanic
+# we can also peek at the data frame before using it
+str(titanic)
+```
+
+a. Convert the `survived` variable to 0, 1 with 1 indicating a passenger who survived, and fit a logistic regression to predict survival based on all other predictors **except `country` and `embarked`**.
+```{r}
+titanic$survived = as.numeric(titanic$survived) - 1
+
+glm.survival = glm(survived ~ gender + age + class + fare + sibsp + parch, family = "binomial", data = titanic)
+summary(glm.survival)
+```
+
+b. Which variables appear to be significant?
+  All predictors besides fare and parch appear to be significant.
+
+c. Interpret the coefficients for `gender`, `age`, and `fare`. Do they appear to correlate with higher or lower odds of survival? How much do the odds of survival appear to change with respect to each of these variables?
+```{r}
+# gender
+exp(-2.692412)
+(exp(-2.692412) - 1) * 100  
+
+# age
+exp(-0.037895)
+(exp(-0.037895) - 1) * 100
+
+# fare
+exp(0.001590)
+(exp(0.001590) - 1) * 100
+```
+The most significant variable seems to be the male gender, restaurant staff or third class. Using the calculations above, the coefficient for gendermale means there is on average a 2.692412 decrease in log odds for chance of survival for males with respect to females. Ultimately, fare appears to correlate with higher odds of survival and males with respect to females and older ages appear to correlate with lower odds of survival.
+
+d. Do your results from c. make sense with your expectations?
+   This makes sense to me because the lower class would be expected to be deep in the ship so it was most difficult for them to get out when it started to sink. Men and especially elders on the titanic were known to give their life boat spots to women and kids.
+
+
+## Question 5
+This question should be answered using the `Carseats` dataset from the `ISLR` package.
+```{r,warning=F,message=F}
+# make sure you have the ISLR package
+library(ISLR)
+
+# you should read the help page by running ?Carseats
+# we can also peek at the data frame before using it
+str(Carseats)
+head(Carseats)
+```
+
+a. First, make some visualizations of the dataset to help set the stage for the rest of the analysis. Try to pick plots to show that are interesting informative.
+```{r}
+df1 = data.frame(Sales = Carseats$Sales,
+           CompPrice = Carseats$CompPrice,
+           Income = Carseats$Income,
+           Advertising = Carseats$Advertising)
+
+df2 = data.frame(Sales = Carseats$Sales,
+           Population = Carseats$Population,
+           Price = Carseats$Price,
+           ShelveLoc = Carseats$ShelveLoc)
+
+df3 = data.frame(Sales = Carseats$Sales,
+                 Age = Carseats$Age,
+                 Education = Carseats$Education,
+                 Urban = Carseats$Urban,
+                 US = Carseats$US)
+
+pairs(df1)
+pairs(df2)
+pairs(df3)
+```
+
+b. Using some variable selection method (CV, stepwise, LASSO, ridge, or even something else), choose a set of predictors to use to predict `Sales`. Try to find the best model that you can that explains the data well and doesn't have useless predictors.
+```{r}
+x = model.matrix(Sales~., Carseats)
+y = Carseats$Sales
+
+
+lm.lasso = glmnet(x,y,alpha=1)
+
+cv.out = cv.glmnet(x,y,alpha=1, type.measure = "mse")
+
+lambda.best = cv.out$lambda.min
+coef(lm.lasso, s = lambda.best)
+
+#coeffs w/ best lambda value
+lasso = lm(Sales ~ CompPrice + Income + Advertising + Population + Price + ShelveLoc + Age + Education + Urban + US, data = Carseats)
+summary(lasso)
+```
+
+c. Which predictors appear to be the most important or significant in predicting sales? Provide an interpretation of each coefficient in your model. Be careful---some of the variables in the model are qualitative!
+   CompPrice, Income, Advertising, Price, ShelveLoc, and Age are all predictors that appear to be the most significant in predicting sales. 
+   Intepretations all while holding other predictors fixed!
+- CompPrice 1 unit increase = a $92.82 increase in sales
+- 1000 dollar increase in income = a 15.8 dollar increase in sales
+- 1000 dollar increase in advertising = a 123.1 dollar increase in sales
+- 1000 increase in population = a $.208 increase in sales
+- 1 dollar increase in price = a $95.4 decrease in sales
+- +1 good quality shelve = a $4850.2 increase in sales
+- +1 medium quality shelve = a $1956.7 increase in sales
+- Increase of age = a $46.05 decrease in sales
+- Increase in education level= a $21.11 decrease in sales
+- +1 urban store = a $122.89 increase in sales 
+- +1 store in the U.S. = a $184.1 decrease in sales
+
+d. Provide $90\%$ confidence intervals for each coefficient in your model.
+```{r}
+confint(lasso, level = .90)
+```
+
+e. Using cross-validation, estimate the true out-of-sample MSE of your model.
+```{r}
+cv.out
+```
+
+f. Check the residuals. Do you think this is an appropriate model to use? Why or why not?
+```{r}
+plot(lasso, which=1:3)
+```
+Looking at the residuals plot, there’s a mean close to zero. Also, the normal QQ plot is mostly linear with a few deviations at each tails. Finally, there is constant variance, however it looks a bit clustered more towards the center in the third plot. Overall, I believe this model is appropriate to use after analyzing these residual plots. Even with slight variations in the Normal QQ plot and the square root of the standardized residuals, the residuals seem reasonable.

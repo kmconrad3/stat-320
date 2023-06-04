@@ -1,0 +1,110 @@
+---
+title: "STAT 340 Final exam - Question 3"
+author: "Kara Conrad"
+date: "5/24/22"
+output: html_document
+---
+
+```{r include=F}
+knitr::opts_chunk$set(echo=T,warning=F,message=F,fig.align="center",error=T)
+library(tidyverse)
+library(lme4)
+library(glmnet)
+library(rvest)
+```
+
+***REMEMBER:***
+ - Unless manual/by hand calculation specifically requested, you can **use any R functions covered in class**. Functions not covered in class MAY NOT be graded (depending on context).
+ - **All plots MUST have reasonably good titles/labels** (quality of titles/labels subject to determination by graders). Failure to do so MAY result in penalties.
+ - Also note that `error=TRUE` has been turned on in the setup chunk. This means that **the file will knit EVEN if there are errors**! This will ensure you always have an HTML file to submit, but remember to ***CHECK YOUR FILE FOR ERRORS BEFORE YOU SUBMIT!!*** You can turn this off if you like, but it seems to help most people.
+
+
+## Question 3: Great Crested Newt
+A survey of great crested newts was conducted in the UK in an effort to better understand their ecology and conserve their habitats.^[https://www.arguk.org/info-advice/advice-notes/9-great-crested-newt-habitat-suitability-index-arg-advice-note-5/file] Many ponds were carefully examined and checked for presence of newt life (0 indicating no newts were present; 1 indicating at least some newts were present). Several predictors were also recorded for each pond, listed below:
+ - `log10area`: pond area (m²)
+ - `dry`: how often the pond dries (1-4: never, rarely, sometimes, annually)
+ - `water`: water quality (1-4: bad, poor, moderate, good)
+ - `shade`: % of shoreline in shade
+ - `bird`: evidence of bird impact (1-3: none, minor, major)
+ - `fish`: evidence of fish impact (1-4: none, possible, minor, major)
+ - `ponds`: # of ponds within 1km
+ - `land`: land habitat quality (1-4: none, poor, moderate, good)
+ - `macro`: % pond area covered by plants
+
+Here's the dataset. We're going to explore different ways of predicting the presence of newts in ponds.
+```{r}
+newt = read.csv('newt.csv', header=TRUE)
+head(newt)
+```
+
+
+### Part I <small>(pts: 1, 2, 2, 2)</small>
+a. Create an 80/20 train/test split (i.e. randomly sample 80% of the rows to be used as a training dataset, and set aside the remaining 20% as a testing dataset).
+```{r}
+samp = sample(1:200, 40)
+test = newt[samp,]
+train = newt[-samp,]
+```
+
+b. Start by fitting a full logistic regression model (i.e. with all terms). **Show a summary table** of the resulting fit
+```{r}
+glm.default = glm(presence ~ ., data = train)
+summary(glm.default)
+```
+
+c. Which predictors are significant? Write interpretations for the 3 most significant predictors. Be sure to indicate the following:
+   - **the direction** of the relationship (i.e. is it linked to increasing or decreasing chance of newt presence?)
+   - **the magnitude** of the relationship (i.e. how much are the chances increasing? Please use **precise** quantitative, statistical language).
+ Ponds- positive direction, shade- negative direction, and fish- negative direction are the 3 most significant predictors
+ ## cant fully answer
+ 
+d. Use your fitted model to generate predictions on the test dataset and compare your predictions to the true test responses to **estimate the out-of-sample mean squared error** (MSE) of this model. **Report the MSE**. (*Hint:* remember to set the `type` argument appropriately to get actual probabilities).
+```{r}
+predict = predict(glm.default, test, type = "response")
+data = data.frame(pred = predict, actual = test$presence)
+mse = mean((data$actual - data$pred)^2)
+mse
+```
+
+
+
+### Part II <small>(pts: 3, 1, 2)</small>
+Let's try a different approach where we try to **simultaneously perform regularization and variable selection**.
+
+a. Choose a regularization method that is also good at selecting out a smaller subset of variables (*Hint:* which method is good at setting coefficients to exactly 0?). Using the `glmnet` package, fit a model of this type, making sure to set the correct value for `alpha`. Also add the argument `family=binomial` to ensure you get a logistic-type fit.
+```{r}
+# create train x and y
+x.train = model.matrix(presence ~ ., data = train )[,-1]
+y.train = train$presence
+
+# create test x and y
+x.test = model.matrix(presence ~ ., data = test )[,-1]
+y.test = test$presence
+
+# get best lambda by using CV
+lambda.best = cv.glmnet( x.train, y.train, alpha = 1 , family=binomial )$lambda.min
+print(lambda.best)
+
+# fit using best lambda
+lasso.newt = glmnet( x.train, y.train, alpha = 1 , family=binomial , lambda=lambda.best )
+```
+
+b. Show the coefficients of your fit. Which predictors were removed from the model by your method? 
+```{r}
+# get coefficients
+coef(lasso.newt)
+```
+
+c. Again, use your fitted model to generate predictions on the test dataset and compare your predictions to the true test responses to **estimate the out-of-sample mean squared error** (MSE) of this model. **Report the MSE** (*hint:* remember to set `type` appropriately!), and **compare this value to the MSE from the first model**. Is this MSE higher or lower? By what percent approximately?
+```{r}
+# get predictions
+prediction = predict(lasso.newt, newx=x.test , type="response" )
+
+# from here, can find the MSE
+mse.lasso = mean( (prediction - y.test)^2 )
+print(mse.lasso)
+
+# report this MSE is higher/lower than the previous by what percent
+percent.improvement = (mse.lasso - mse) / mse * 100
+print(percent.improvement)
+```

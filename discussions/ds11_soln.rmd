@@ -1,0 +1,123 @@
+---
+title:  "STAT340: Discussion 11: ANOVA"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+# check packages installed
+knitr::opts_chunk$set(echo=T)
+library(tidyverse)
+```
+
+
+## Exercises
+
+We will practice working with ANOVA models in this discussions.
+
+
+### 1)
+
+A group of 32 rats were randomly assigned to each of 4 diets labelled A, B, C, and D. The response is the liver weight as a percentage of body weight.
+
+```{r}
+liver = read.csv(text="3.42,3.17,3.34,3.65
+3.96,3.63,3.72,3.93
+3.87,3.38,3.81,3.77
+4.19,3.47,3.66,4.18
+3.58,3.39,3.55,4.21
+3.76,3.41,3.51,3.88",col.names=LETTERS[1:4])
+
+liver
+```
+
+
+a. State your hypotheses and any assumptions you need to make.
+
+Random samples of rats are independently selected from 4 populations. The 4 rat populations are normal with equal variance.
+
+H0: mean liver weight as a percentage of body weight of each diet are equal
+HA: at least one mean is not equal to the others
+
+b. Construct an ANOVA table manually (using basic R functions) OR using the `aov()` function (recommended to do both ways!)
+
+```{r}
+# convert to long format
+liver.long = liver %>% pivot_longer(1:4,"diet",values_to="percent_liver_weight") %>% arrange(diet)
+
+liver.long
+```
+
+```{r}
+aov.liver = aov(percent_liver_weight ~ diet, data=liver.long)
+summary(aov.liver)
+```
+
+```{r}
+summary(lm(percent_liver_weight ~ diet, data=liver.long))
+```
+
+
+c. Interpret the results in the context of the original problem. What is your conclusion?
+
+Strong evidence that at least one treatment mean is different.
+
+d. **If necessary**, conduct post-hoc analysis to identify which groups are significantly different.
+
+```{r}
+TukeyHSD(aov.liver, conf.level=.95)
+```
+
+B-A, D-B, D-C are different, other diets are not.
+
+```{r}
+plot(TukeyHSD(aov.liver, conf.level=.95))
+```
+
+
+e. Assess your assumptions. Is there any evidence the model results are unreliable? Explain. If you find strong enough evidence of model assumption violations, run a Kruskal-Wallis test as an alternative analysis.
+
+```{r}
+par(mfrow=c(1,2))
+plot(aov.liver,which=1:2,ask=F)
+```
+
+```{r}
+kruskal.test(percent_liver_weight ~ diet, data=liver.long)
+```
+
+
+### 2)
+
+We have a dataset of mean improvements in jump height (in inches) from two different college basketball training programs, as well as several other variables. The data is shown below:
+
+```{r}
+heights = data.frame(program=factor(rep(c(1, 2), each=20)),
+                     gender=factor(rep(c('M', 'F'), each=10, times=2)),
+                     division=factor(rep(c(1, 2), each=5, times=4)),
+                     height=c(7, 7, 8, 8, 7, 6, 6, 5, 6, 5,
+                              5, 5, 4, 5, 4, 3, 3, 4, 3, 3,
+                              6, 6, 5, 4, 5, 4, 5, 4, 4, 3,
+                              2, 2, 1, 4, 4, 2, 1, 1, 2, 1))
+
+print(heights)
+```
+
+Analyze the data to determine which factors have the largest impact on overall height improvement. Repeat parts a-c. and e. from question 1. (Note this time, you're not required to know how to compute manually)
+
+```{r}
+aov.heights = aov(height~program*gender*division, data=heights)
+summary(aov.heights)
+```
+
+```{r}
+TukeyHSD(aov.heights, conf.level=.95)
+```
+
+```{r}
+par(mfrow=c(1,2))
+plot(aov.heights,which=1:2,ask=F)
+```
+
+
+
+

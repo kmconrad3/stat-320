@@ -1,0 +1,220 @@
+---
+title: "STAT340 HW05: Multiple testing, bootstrap"
+date: "5/8/2022"
+author: "Kara Conrad"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo=T,warning=F,message=F)
+library(tidyverse)
+```
+
+## Problem 1 (15 pts)
+Suppose we test $m$ null hypotheses, all of which are true. We control the Type I error for each null hypothesis at level $\alpha$. For each sub-problem, justify your answer.
+
+  a. In total, how many Type I errors do we expect to make?
+The rate of type I errors is alpha for each hypotheses. So, in this case the number of type I errors would be m times alpha.
+
+  b. Suppose that the $m$ tests that we perform are independent. What is the family-wise error rate associated with these $m$ tests? Hint: If two events $A$ and $B$ are independent, then $\operatorname{Pr}(A \cap B)=$ $\operatorname{Pr}  A. \operatorname{Pr}(B)$.
+The family-wise error rate is the probability that out of m events, at least one is error. So P(error >= 1) = 1 - P(error = 0) = 1-(1-a)^m.
+
+  c. Suppose that $m=2$, and that the $p$-values for the two tests are positively correlated, so that if one is small then the other will tend to be small as well, and if one is large then the other will tend to be large. How does the family-wise error rate associated with these $m=2$ tests qualitatively compare to b. with $m=2$?
+     - *Hint: First, suppose that the two p-values are perfectly correlated.*
+If the p-values for these tests are positively correlated, then the family-wise error rate associated will decrease. This is since when they are highly correlated with each other, then it is less likely for there to be a false positive. In a case like this, we can either reject or fail to reject both null hypotheses.
+
+  d. Suppose again that $m=2$, but that now the $p$-values for the two tests are negatively correlated, so that if one is large then the other will tend to be small. How does the family-wise error rate associated with these $m=2$ tests qualitatively compare to the answer in   b. with $m=2$?
+     - *Hint: First, suppose that whenever one $p$-value is less than $\alpha$, then the other will be greater than $\alpha$. In other words, we can never reject both null hypotheses.*
+If the p-values for these tests are negatively correlated, then it would be the opposite outcome of part c. So the family-wise error rate associated will increase. Because the two p-values differ vastly in a negative correlation, this may lead us to reject one null hypothesis, and fail to reject the other. Thus, this would result in the family-wise error rate increasing.
+
+
+
+***
+
+
+
+## Problem 2 (20 pts)
+In this problem, we will simulate data from $m=100$ fund managers.
+```{r}
+set.seed(1)
+n = 20
+m = 100
+X = matrix(rnorm(n*m), ncol=m)
+
+# show a few of the first columns
+options(width=140)
+print(round(X[1:20,1:10],5))
+```
+The data represents each fund manager's percentage returns for each of $n=20$ months. We wish to test the null hypothesis that each fund manager's percentage returns have population mean equal to zero. Notice that we simulated the data in such a way that each fund manager's percentage returns do have population mean zero; in other words, all $m$ null hypotheses are true.
+
+  a. Conduct a one-sample $t$-test for each fund manager, and plot a histogram of the $p$-values obtained.
+```{r}
+t.test(X[,1], mu=0)$p.value
+
+data = array(dim=c(100))
+i=1
+while(i <= 100){
+  data[i] = t.test(X[,i],mu=0)$p.value
+  i = i+1
+}
+hist(data)
+```
+ 
+  b. If we control Type I error for each null hypothesis at level $\alpha=$ $0.05$, then how many null hypotheses do we reject?
+```{r}
+i = 1
+count = 0
+while(i <= 100){
+  if (data[i] < 0.05 || data[i] > .95){
+    count = count + 1
+  }
+  i = i + 1
+}
+count
+```
+  
+  c. If we control the FWER at level $0.05$, then how many null hypotheses do we reject?
+```{r}
+m = 100
+alpha = 0.05
+data = sort(data)
+alpha.m = array(dim = c(100))
+i = 1
+index = 100
+while(i <= 100){
+  alpha.m[i] = alpha/(100-i+1)
+  if(data[i]>=alpha.m){
+    index = i
+    break
+  }
+  i = i + 1
+}
+data
+
+alpha.m
+
+index
+```
+  
+  d. Now suppose we "cherry-pick" the 10 fund managers who perform the best in our data. If we control the FWER for just these 10 fund managers at level $0.05$, then how many null hypotheses do we reject?
+```{r}
+i = 1
+averages = array(dim=c(100))
+while(i<=100){
+  averages[i] = mean(X[,i])
+  i = i + 1
+}
+averages = sort(averages)
+vala = array(dim=c(10))
+i=1
+j=1
+while(i<= 100){
+  if(mean(X[,i]) >= averages[90]){
+    vala[j] = t.test(X[,i],mu = 0)$p.value
+    j = i +1
+  }
+  i = i + 1
+}
+vala = sort(vala)
+alpha = 0.05
+i = 1
+index = 10
+while(i<=10){
+  alpha.m = alpha/(10-i+1)
+  if (vala[i] >= alpha.m){
+    index = i
+    break
+  }
+  i = i + 1
+}
+index
+```
+  
+  (((e. **(OPTIONAL):** Read the FDR section at the end of the multiple comparison notes. Repeat part d. above but controlling for FDR at $0.05$ instead.)))
+
+
+
+***
+
+
+
+## Problem 3 (15 points)
+In this problem, you'll get a bit of practice using the bootstrap, which we discussed before the Thanksgiving break.
+Let's revisit the mule kicks data, which you saw in HW3. Recall that the data is available for download [here](https://kdlevin-uwstat.github.io/STAT340-Fall2021/hw/03/mule_kicks.csv), and that this is a simplification of a famous data set, consisting of the number of soldiers killed by being kicked by mules or horses each year in a number of different companies in the Prussian army near the end of the 19th century.
+
+The following block of code downloads the data and stores it in the variable `mule_kicks`.
+```{r}
+mule_kicks = read_csv('https://kdlevin-uwstat.github.io/STAT340-Fall2021/hw/03/mule_kicks.csv')
+head(mule_kicks)
+```
+The data frame `mule_kicks` has a single column, called `deaths`. Each entry is the number of soldiers killed in one corps of the Prussian army in one year. There are 14 corps in the data set, studied over 20 years, for a total of 280 death counts.The different corps have been dropped from the data set for the purposes of this problem, so the data set is just a collection of 280 different numbers, each counting how many people died of mule kicks in one corp in one year (i.e., the counts are something like "deaths per corp per year").
+
+__Part a:__ As in HW3, let's assume that mule kicks data is generated according to a Poisson distribution with parameter $\lambda$. That is, assume that the data frame `mule_kicks` contains 280 independent Poisson random variables with shared rate parameter $\lambda$. Use the bootstrap to construct a 95% confidence interval for $\lambda$, using $B=200$ bootstrap replicates.
+```{r}
+B = 200
+n = 280
+lambda.hat = mean(mule_kicks$deaths)
+replicates = rep(NA,B)
+for(i in 1:B){
+  resample = sample(mule_kicks$deaths, n, replace = T)
+  replicates[i] = mean(resample)
+}
+sd_lambda = sd(replicates)
+conf.int = c(lambda.hat-1.96*sd_lambda, lambda.hat+1.96*sd_lambda)
+conf.int
+```
+
+__Part b:__ In the next few parts of this problem, we're going to explore the effect of the number of bootstrap replicates $B$ on our confidence interval. Toward that end, write a function `mule_kick_bootstrap` that takes a single argument `B`, specifying the number of bootstrap replicate, and returns a 95% confidence interval for the parameter $\lambda$ in the form of a vector, something like `c( lower, upper)`. That is, this function should essentially repeat the work you did in part a, except it should change the number of bootstrap replicates accordingly. You may assume that the argument `B` is a positive integer.
+```{r}
+mule_kick_bootstrap <- function( B ) {
+  n = 280
+  lambda.hat = mean(mule_kicks$deaths)
+  replicates = rep(NA,B)
+  for(i in 1:B){
+    resample = sample(mule_kicks$deaths, n, replace = T)
+    replicates[i] = mean(resample)
+  }
+  sd_lambda = sd(replicates)
+  conf.int = c(lambda.hat-1.96*sd_lambda, lambda.hat+1.96*sd_lambda)
+  conf.int
+  return(conf.int)
+}
+```
+
+__Part c:__ Run your function for $B=10,50$ and $200$ and compare the resulting confidence intervals. Do you notice differences? Of course, the actual results will be random, but what do you *expect* might be the consequences of choosing $B$ too small? Of course, it stands to reason that we want to choose $B$ as big as possible (because more bootstrap samples means a better estimate of the variance), but what might be the problem(s) with choosing $B$ really large (e.g., several thousand)? As usual, there are no strictly right or wrong answers, here. Just write enough to show that you've thought about this a bit!   __Hint:__ each bootstrap sample takes time!
+```{r}
+mule_kick_bootstrap(10)
+mule_kick_bootstrap(50)
+mule_kick_bootstrap(200)
+```
+Explanation: Taking the 200 samples, the CI will be based on the 5th smallest and 5th largest values. This means that as we decrease the number of samples, the smallest and largest variables will be influenced by variance. So when we have a larger sample size the values may be underestimating the variance which will cause discontinuity in the results.
+
+(((__Part d:__ **(OPTIONAL)** Now, presumably choosing different numbers of bootstrap samples $B$ should have some effect on the coverage rate of our CI, but we have no way to check that with the mule kicks data, because we don't know the *true* model that generated the data. Instead, let's do the next best thing and run a simulation.
+Write a function called `poisboot_run_trial` that takes three arguments and returns a Boolean:
+-`n` : the number of samples to draw (assumed to be a positive integer)
+-`lambda` :  Poisson rate $\lambda$ (assumed to be a positive numeric)
+-`B` : the number of bootstrap samples (assumed to be a positive integer)
+Your function should:
+1. Generate `n` independent draws from a Poisson with parameter `lambda`
+2. Use the bootstrap with `B` bootstrap replicates to construct a 95% confidence interval for `lambda`.
+3. Return a Boolean encoding whether or not the confidence interval contains the true parameter `lambda` (i.e., returns `TRUE` if `lambda` is bigger than the lower-limit of the CI and smaller than the upper-limit, and returns `FALSE` otherwise)
+```{r}
+
+poisboot_run_trial <- function( n, lambda, B ) {
+  
+  # TODO: code goes here.
+  # Reminder: your code should return a Boolean!
+}
+
+```
+)))
+
+(((__Part e:__ **(OPTIONAL)** Use the function you wrote in Part d to estimate the coverage rate of the bootstrap-based confidence interval for `B` equal to $10,50$ and $200$ bootstrap replicates with `n=30` and `lambda=5`. For each of these three values of `B`, you should run `poisboot_run_trial` 1000 times (i.e., 1000 Monte Carlo iterates) and record what fraction of the time the CI contained the true value of `lambda`. What do you observe?
+__Hint:__ you might find it helpful to write a function `estimate_coverage` that takes a positive integer argument `NMC` and runs `poisboot_run_trial` `NMC` times, keeping track of how often the CI contains the true parameter.
+By now, this kind of experiment should look very familiar from previous lectures, homeworks and exams.
+```{r}
+
+# TODO: code goes here.
+
+```
+Explanation:)))

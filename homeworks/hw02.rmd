@@ -1,0 +1,291 @@
+---
+title: "STAT340 HW2: Monte Carlo & Testing"
+author: Kara Conrad
+date: 3/3/2022
+output: html_document
+---
+<style>
+table{width:50%!important;margin-left:auto!important;margin-right:auto!important;}
+/*ol[style*="decimal"]>li{margin-top:40px!important;}*/
+</style>
+
+```{r setup, include=FALSE}
+# check packages installed
+if(!require(pacman)) install.packages("pacman")
+pacman::p_load(ggplot2)
+knitr::opts_chunk$set(tidy=FALSE,strip.white=FALSE,fig.align="center",comment=" #")
+options(width=100)
+
+library(tidyverse, dplyr)
+library(stringr)
+```
+
+<br/>
+
+## Instructions
+
+Complete the exercises, update the "author" and "date" fields in the header, knit it, and submit **both the HTML and RMD** files to Canvas. Due date: **Mar 4, 2022 at 11:59pm**.
+
+---
+
+
+
+## Exercise 1 (20 points): Generalized [birthday problem](https://en.wikipedia.org/wiki/Birthday_problem)
+
+The birthday problem asks for the probability that in a group of $n$ people, at least 2 people will share the same birthday. This is easy to solve, and the solution is easily found online.
+
+We can generalize this to a more difficult problem and solve it using a Monte Carlo approach: in $n$ people, what is the probability that at least $k$ people have the same birthday?
+
+Write a function `birthday(n,k,i)` that returns a probability estimate given 3 arguments:
+ - $n$ is the number of people in your sample
+    - for example, if `n=50` is used, we are asking "in 50 people, what is the probability that..."
+ - $k$ is minimum number of people that must share a birthday
+    - for example if `k=4` is used, we asking "...what is the probability that at least 4 people share the same birthday?
+ - $i$ is the number of iterations to run (default 1000)
+    - for example, if `i=1000` is used, your function should run 1000 simulations
+
+**Notes**:
+ - You may assume there are 365 possible dates (no leap years)
+ - You may assume birthdays are uniformly distributed across the calendar
+    - this is actually not true, see [this](https://www.panix.com/~murphy/bday.html), or [this](https://fivethirtyeight.com/features/lots-of-parents-dont-want-their-kids-to-be-born-on-leap-day/)
+ - You may assume the people are sampled [i.i.d](https://en.wikipedia.org/wiki/Independent_and_identically_distributed_random_variables)
+
+**Hints**:
+ 1. There's no need to use actual dates in the simulation process. Numbers can represent dates and are easier to generate and manipulate in `R`. In particular, we recommend using the `sample()` function with the `x`, `size`, and `replace` arguments set appropriately. See the help page `?sample` for details.
+ 2. Given a vector of numbers, you can easily find duplicates by using the `table()` function. This will produce a named vector showing how many of each value there are. For example, running `table(c(1,3,5,5,7,9,9,9))` will show you there is one 1, one 3, two 5s, one 7, and three 9s.
+ 3. In your function, you will need to use a `for` loop to repeat the simulation `i` times. You will also need a variable outside your `for` loop to keep track of how many simulations satisfy that \# of birthdays $\geq k$.
+ 4. If your function is running correctly, then `birthday(n=23, k=2)`, `birthday(n=87, k=3)` and `birthday(n=188, k=4)` should all be approximately $50\%$.
+ 5. If your function is very slow, consider using the [`Table` function](https://rdrr.io/cran/Rfast/man/Table.html) from the Rfast package, which is 4-5 times faster than the normal `table()` function.
+
+```{r}
+birthday = function(n,k,i=1000){
+  # i=1000 sets the default value of i to be 1000
+  results = rep(NA, i)
+  for(index in 1:i) {
+    sample_data = table(sample(c(1:365), n, replace = TRUE))
+    counter = max(sample_data)
+    if (counter >= k) {
+      results[index] = 1 }
+    else {
+      results[index] = 0
+    }
+  }
+  
+  return (sum(results) / i)
+}
+
+# Testing
+print(birthday(n = 23, k = 2))
+print(birthday(n=87, k=3))
+print(birthday(n=188, k=4))
+
+birthday(n=162, k=4)
+```
+
+This class currently has 162 enrolled students. What is the approximate probability that at least $4$ students have the same birthdays?
+The probability with these parameters for our class is roughly 35.9%.
+
+---
+
+
+
+## Exercise 2 (15 points): Simulate RV
+
+$X$ is a random variable defined between $-\frac\pi2$ and $\frac\pi2$ by the probability density function $f(x)=\frac12\cos(x)$. Note this means the cumulative distribution function is $$F(x)=\int_{-\frac\pi2}^xf(x)dx=\frac12(\sin(x)+1)$$ Write a function `rx(n)` to sample from this random variable, where `n` is the size of the sample to be drawn. Then, use your function to draw a sample of 1000 and plot a histogram of the output.
+
+**Hint:** Remember the inverse function of $\sin(x)$ is $\arcsin(x)$, which in `R` is found by using the built in function `asin()`
+
+```{r,fig.width=4,fig.height=3}
+# defining pdf of X
+pdf_x = Vectorize(function(x){
+  if(x>-pi/2 & x<pi/2){cos(x)/2} else 0
+})
+
+# pdf plot
+ggplot() + geom_function(fun=pdf_x,n=10001) + theme_minimal() + 
+  xlim(c(-2.5,2.5)) + ylim(-.5,1) + labs(x='x',y='f(x)')
+```
+
+```{r}
+rx = function(n){
+  x=runif(n)
+  # runif generates random deviates
+  return(asin((2*x) -1 ))
+}
+
+hist(rx(1000))
+```
+
+---
+
+
+
+## Exercise 3 (15 points): Testing coin flips
+
+In the six sequences below, **only one** of them is actually randomly generated from a fair coin. Use a combination of everything you know (common sense, monte carlo, hypothesis testing, etc.) to identify which is actually random and explain your reasoning.
+
+(***For full points***, conduct a formal test and report a $p$-value for each sequence. You may use a combination of multiple tests to arrive at your answer. If you cannot compute a $p$-value for each sequence, you can still earn a significant amount of partial credit by carefully explaining your reasoning and response as best as you can.)
+
+```{r}
+flips1 = "HTHTHTHTHTHTHTHTHTHTHTHTHTHTHTHTHTHTHTHTHTHTHTHTHTHTHTHTHTHTHTHTHTHTHTHTHTHTHTHTHTHTHTHTHTHTHTHTHTHTHTHTHTHTHTHTHTHTHTHTHTHTHTHTHTHTHTHTHTHTHTHTHTHTHTHTHTHTHTHTHTHTHTHTHTHTHTHTHTHTHTHTHTHTHTHTHTHTHTHT"
+
+flips2 = "HHHTHTTTHHTHHTHHHTTTTHTHTHHTTHTHHHTHHTHTTTHTHHHTHTTTHTHTHHTHTHTTHTHHTHTHTTTHTHHHTHTHTTHTHTHHTHTHTHHHTHTTTHTHHTHTHTHHTTTHTHHTHHTTTTHTHTHHHTHTTHTHHTHTHTTHTHHTHTHHHTHHHTHTTTHTTHTTTHTHHHTHTHTTHTHHTHHTHTTT"
+
+flips3 = "HHTHTHTTTHTHHHTHHTTTHTHHTHTTTHTHTHHTHTHTTHTHHHHHHTTTHTHTHHTHTTTHTHHTHTHTTTHTHHHTTHTTTHTHTHHHHTHTTHHTTTTTHTHHHTHTHTTTTTHHHTHHTHHTHHHTTTTHTHTHHHTHHTTTTTHTHHHTHTHTHTTTHTHHHTHTHTHTTHTHHTHTHTHTTTTHTHHHTHTH"
+
+flips4 = "HTHHHHHHHTHTTHHTTHHHTHTHTTTHHTHHHTHHTTHTTTTTTTTTHTHHTTTTTHTHTHTHHTTHTTHTTTTTHHHTHTTTHTHTHHHTHTTTTHTHTHHTTHTHTTHHTHTHHHHTHTTHHTTHTTHTTHTHHHHHHTTTTTTHHHTTHTHHHHTTTHTTHHHTTHTHHTTTHHTHHTTTHTHHTHHHTHHTTHHH"
+
+flips5 = "HHHHHHHHHHTTTTTTTTTTHHHHHHHHHHTTTTTTTTTTHHHHHHHHHHTTTTTTTTTTHHHHHHHHHHTTTTTTTTTTHHHHHHHHHHTTTTTTTTTTHHHHHHHHHHTTTTTTTTTTHHHHHHHHHHTTTTTTTTTTHHHHHHHHHHTTTTTTTTTTHHHHHHHHHHTTTTTTTTTTHHHHHHHHHHTTTTTTTTTT"
+
+flips6 = "TTHTTTHTTTTTTTHTHTHTHTTHTTHTHHTHHTTTHHTHTTTHTHHTHHHTHTTHHTHHTTHTHTTTTHTHTTTHHTTTTTTTTHTHHTTHTTTTTTHTHTHTHTTTHTTHHTTHTTTHHTTTHTTHTTTTHTTTTHHTTTHTHTHHHTTTTTTHTHHTTTTTTTTTTTTHHHTTTHHHTTTHTTTHTHTTHTTTTTHT"
+
+# you can use the function below to split the above sequences in vectors of flips
+split = function(str) strsplit(str, split="")[[1]]
+split(flips1)
+
+flip1 = split(flips1)
+flip2 = split(flips2)
+flip3 = split(flips3)
+flip4 = split(flips4)
+flip5 = split(flips5)
+flip6 = split(flips6)
+```
+
+```{r}
+# length finding
+longestRun = function(flips){
+  MaxRunSoFar = 1 # always length 1 after first flip
+  currentRun = 1
+  for(i in 2:length(flips)){ 
+    if(flips[i]==flips[i-1]){
+      currentRun = currentRun + 1
+      if(currentRun>MaxRunSoFar){MaxRunSoFar = currentRun} }
+    if(flips[i]!=flips[i-1]){
+      currentRun=1 }
+  }
+  return(MaxRunSoFar)
+}
+
+
+# Helper function to simulate data
+simulate_S = function(){
+  S = sample(c("H","T"), 200,replace=T) %>% longestRun()
+  return(S)
+}
+
+
+# Helper function to see if the simulated data is <= the longest run of the flip sequence
+check_if_S_in_A = function(S, longest_run){
+  return(S  <= longest_run)
+}
+
+
+# Calculates the p-value based on the sequence of flips
+longest_run_test = function(flips){
+  real_longest_run = flips %>% longestRun()
+  r = 1000
+  monte_carlo = data.frame(replicate = 1:r, 
+                         S = rep(NA,r), 
+                         S_in_A = rep(NA, r)) 
+  for(i in 1:r){
+    monte_carlo$S[i] = simulate_S() }
+  for(i in 1:r){
+    monte_carlo$S_in_A[i] = check_if_S_in_A(monte_carlo$S[i], real_longest_run) }
+  monte_carlo = as_tibble(monte_carlo)
+  p_value = monte_carlo %>% summarise(mean(S_in_A))
+  return(p_value)
+  }
+```
+
+```{r}
+print(longest_run_test(flip1))
+print(longest_run_test(flip2))
+print(longest_run_test(flip3))
+print(longest_run_test(flip4))
+print(longest_run_test(flip5))
+print(longest_run_test(flip6))
+```
+
+
+```{r}
+# odds ratio for flips 3-6
+if(!"runner" %in% rownames(installed.packages())) {install.packages("runner")}
+tableOfPairs = function(vec){
+  return(table(runner::runner(vec,k=2,f=paste,collapse="")[-1]))
+}
+
+
+ratioFromTable = function(tb){
+  return(setNames((tb["HH"]/tb["HT"])/(tb["TH"]/tb["TT"]),"Ratio"))
+}
+
+
+ratio_test = function(flip_sequence) {
+  actual_ratio = ratioFromTable(tableOfPairs(flip_sequence))
+  N = 1000
+  mc.ratios = rep(NA,N)
+  for(i in 1:N){
+    mc.ratios[i] = ratioFromTable(tableOfPairs(sample(flip_sequence))) }
+  hist(mc.ratios)
+  lines(c(actual_ratio,actual_ratio),c(0,2600),col="red",lwd=3)
+  if (actual_ratio == 90) {
+    counts = mc.ratios > actual_ratio } 
+  else {
+    counts = mc.ratios < actual_ratio }
+  pvalue = sum(counts) / length(counts)
+  return (pvalue)
+}
+```
+
+```{r}
+ratio_test(flip3)
+ratio_test(flip4)
+ratio_test(flip5)
+ratio_test(flip6)
+```
+
+
+```{r}
+# proportion test for flips 4 and 6
+simulate_S = function() {
+  lots_of_random_variables = rbinom(n = 200, size = 1, p = 1 / 2)
+  X = mean(lots_of_random_variables)
+  S = X - 1 / 2
+  return(S)
+}
+
+
+check_if_S_in_surprising_set = function(S, real) {
+  return(abs(S) >= abs(real - .5))
+}
+
+
+proportion_test = function(heads_count) {
+  head.prob = heads_count / 200
+  r = 1000
+  monte_carlo = data.frame(
+    replicate = 1:r,
+    S = rep(NA, r),
+    S_in_suprising_set = rep(NA, r) )
+  for (i in 1:r) {
+    monte_carlo$S[i] = simulate_S()
+    monte_carlo$S_in_suprising_set[i] = check_if_S_in_surprising_set(monte_carlo$S[i], head.prob)
+  }
+  monte_carlo = as_tibble(monte_carlo)
+  return (monte_carlo %>% summarise(mean(S_in_suprising_set)))
+}
+```
+
+```{r}
+proportion_test(str_count(flips4, "T"))
+proportion_test(str_count(flips6, "H"))
+```
+
+Response goes here:
+I chose 3 different testing types covered in class lectures to find which sequence of flips was randomly generated. First, I conducted a longest run test with the null hypothesis stating each coin flip in the sequence is independent. After this test, flip sequences 1 and 2 had p values of 0,while the remaining sequences had a p value greater than .05, meaning the null hypothesis for sequences 1 and 2 can be rejected since they are insignificant, meaning those sequences are not independent.
+
+Next, I used a ratio test to more powerfully determine the independence of the remaining 4 coin flips by performing permutations on the data. Again, my null hypothesis stated each coin flip in the sequence is independent. In the ratio test, I include a histogram to show the spread of the permutated data vs. the real sequences' ratio. This ratio was determined as (HH/HT)/(TH/TT). Then, I calculate a p value by summing the extreme observations compared to actual ratio value and dividing by the total. The results show both flip sequence 3 and 5 having p values of 0, so we can reject the null hypothesis in these cases and eliminate them.
+
+For the third test, I analyzed the proportions of heads in the sequence to determine if the sequences are independent and comparing this proportion to simulated flips. My null hypothesis, again similar to the last 2, was each heads coin flip result is independent, with probability 1/2. After calculating the p values, sequence 4 has a p-value of about .949 and sequence 6 has a p-value of 0. We can reject our null hypothesis for sequence 6 since it is below .05. Sequence 4 confirms the null hypothesis that the head flips are independent in the sequence.
+
+After eliminating the sequences throughout running the 3 different tests, it can be observed that flip sequence 4 is the truly random generated sequence of fair flips.

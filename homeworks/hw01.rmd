@@ -1,0 +1,164 @@
+---
+title: "STAT340 HW1: Random Variables and R Review"
+output: html_document
+---
+
+## Problem 1 (10 points): Generating random variables
+
+Let's use R to generate a single Binomial, Geometric, and Poisson random variable.
+You can choose the parameter of the distribution to be anything you like.  
+Here are the function names: `rbinom, rgeom, rpois`.
+Remember that the "r" stands for "Random".
+
+### 1a) Read the help files for these functions. **What are the 8 headings in each of the help files?**
+Reading the help files is hard at first, but it is an essential skill.  Have a look at the help files for these functions. (hint: description, usage, ...)
+```{r}
+?rbinom 
+?rgeom
+?rpois
+```
+You can type your (short!) answer here:
+rbinom, rgeom and rpois help section headings are are the same, in the same order. They are: description, usage, arguments, details, value, source, see also, examples
+
+### 1b) Generate a single copy of each random variable. Once again, you may set parameters however you like.
+```{r}
+# generate a single Binomial random variable:
+rbinom(n = 1, size = 10, prob = .3)
+
+# generate a single Geometric random variable:
+rgeom(n = 1, prob = .4)
+
+# generate a single Poisson random variable:
+rpois(n = 1, lambda = 8)
+```
+
+### 1c) Generate ten copies of each random variable.
+```{r}
+# generate 10 Binomial random variables:
+rbinom(n = 10, size = 20, prob = .3)
+# generate 10 Geometric random variables:
+rgeom(n = 10, p = 0.25)
+# generate 10 Poisson random variables:
+rpois(n = 10, lambda = 8)
+```
+
+
+
+## Problem 2 (10 points): Making histograms
+One way to think about random variables is through their "distribution".
+To see what the distributions of different random variables look like, generate 1,000 copies of some random variables (indicated in the code below) and put them in a histogram:
+
+```{r}
+# Exponential:
+hist(rexp(n = 1000, rate=1/5))
+  # or 
+  library(magrittr)
+  rexp(10000, rate=1/5) %>% hist # . as x-axis instead of distribution details 
+
+# Binomial:
+hist(rbinom(n = 1000, size = 10, prob = .3))
+
+# Normal:
+rnorm(n = 1000, mean = 70, sd = 1) %>% hist
+```
+
+Repeat the last step, but change the value of the parameter that you put in.  
+```{r}
+# Exponential:
+hist(rexp(n = 1000, rate = 1))
+  # or 
+  library(magrittr)
+  rexp(1000, rate=1) %>% hist
+
+# Binomial: (change p, not the size parameter)
+hist(rbinom(n = 1000, size = 10, prob = .8))
+# Binomial: (change the size parameter, not p)
+hist(rbinom(n = 1000, size = 30, prob = .3))
+
+# Normal: (change the mean, not the standard deviation)
+hist(rnorm(n = 1000, mean = 40, sd = 1))
+# Normal: (change the standard deviation, not the mean)
+hist(rnorm(n = 1000, mean = 70, sd = 8))
+```
+
+
+
+## Problem 3 (5 points): What happens to the histogram in Problem 2 above when the parameter gets bigger or smaller?  
+Answer in words:
+1) Exponential: the histogram "expands out to the right" as the rate decreases.
+
+2) Binomial (changing p): The frequency levels move to the right as the probability increased from .3 to .8. The size range goes up to 10 so with variables in that range with probability at .8, the frequency with be higher around the variables equal to 8.
+
+3) Binomial (changing n): PROBLEM 2 SAYS CHANGE SIZE, SO I WILL TALK ABOUT THAT! The x axis is wider now in terms of how far spread it is. This is because  random variables can now land in between 0 up to 30 now.
+
+4) Normal (changing mu): Now the mean which is mu of random variables is centered around 40 instead of 70. So essentially the graph moved over to the left as the mean decreased.
+
+5) Normal (changing sigma): The range of where 95% of the random variables lie has increased from 2 to 16 on either side of the mean. This is the variance. So the x axis of values has widened to show all the frequencies of the random variables.
+
+
+
+## Problem 4 (10 points): Evaluating probability mass/density functions
+Now let's answer the same question, but this time using the built-in R functions for evaluating probability distributions.
+That is, instead of generating random variables to approximate the true distribution, let's evaluate the probability mass or density exactly.
+```{r}
+# Exponential, for values k=0,1,2,...,20:
+k <- seq(0,20)
+plot( k, dexp(k ,rate=1))
+
+# Binomial(n=10,p=0.3), for values k=0,1,2,...,9,10:
+kk <- seq(0,10)
+plot(kk, dbinom(kk, size=10, p =.3))
+
+# Normal(mean=0,sd=1), for x in [-3,3] in increments of size 0.1:
+x <- seq(-3,3,0.1)
+plot( x, dnorm(x, mean=0, sd=1)) 
+# Note that this is a density, not a mass function. For plotting purposes, we can't evaluate the pdf at EVERY point, so we'll just choose a few.
+
+# Normal(mean=1,sd=2), for x in [-5,7] in increments of size 0.1
+xx <- seq(-5,7,0.1)
+plot( xx, dnorm(xx, mean=1, sd=2))
+```
+
+
+
+## Problem 5 (15 points): Defining some simple functions in R.
+This is not a programming course, but it's important that you become familiar with some basic programming concepts this semester. Let's close by getting some practice with function definition in R.
+```{r}
+# 5a) Define a function sum_of_normals that takes a single argument n (assume that n is a non-negative integer), generates n independent normals with mean 0 and variance 1, and returns their sum. Hint: pay attention to the case n=0. What should be the sum of zero normals?
+sum_of_normals <- function( n ){
+  if (n<=0){
+    return(0)
+    }
+  return(sum(rnorm(n, mean=0, sd=.5)))
+}
+
+sum_of_normals(8)
+
+
+# 5b) Define a function sum_of_poissons that takes two arguments: a non-negative integer n and a positive real lambda. Your function should generate n independent Poisson random variables with shared parameter lambda, and return their sum. Assume that n is a non-negative integer and lambda is a positive real (i.e., numeric). n and lambda default to 1, so that sum_of_poissons(5) returns the sum of five Pois(1) random variables.
+sum_of_poissons <- function( n=1, lamb=1) {
+  if (n<=0 || lamb<0){
+    return(0)
+  }
+  return(sum(rpois(n, lamb)))
+}
+
+sum_of_poissons(5)
+
+
+# 5c) Define a function max_of_normals that takes three arguments:
+# a non-negative integer n
+# a real number (i.e., numeric) mu
+# a positive real (i.e., positive numeric) sigma
+# Your function should generate n independent normals with mean and sd given by mu and sigma, respectively, and return the maximum of those n normal RVs.
+# mu should default to 0 and sigma should default to 1. There should be no default value for n.
+# Hint: be careful of the case n=0. By convention, the maximum of an empty set (e.g., the maximum of a collection of zero normals) 
+# By convention, the maximum of an empty set is negative infinity.
+max_of_normals <- function(n, mu=0, sigma=1){
+  if (n==0){
+    return(-Inf)
+  }
+  return( sort(rnorm(n, mean=mu, sd=sigma), decreasing=TRUE)[1] )
+}
+max_of_normals(n=5)
+```

@@ -1,0 +1,158 @@
+---
+title: "STAT 340 Final exam - Question 2"
+author: "Kara Conrad"
+date: "5/24/22"
+output: html_document
+---
+
+```{r include=F}
+knitr::opts_chunk$set(echo=T,warning=F,message=F,fig.align="center",error=T)
+library(tidyverse)
+library(lme4)
+library(glmnet)
+```
+
+
+***REMEMBER:***
+ - Unless manual/by hand calculation specifically requested, you can **use any R functions covered in class**. Functions not covered in class MAY NOT be graded (depending on context).
+ - **All plots MUST have reasonably good titles/labels** (quality of titles/labels subject to determination by graders). Failure to do so MAY result in penalties.
+ - Also note that `error=TRUE` has been turned on in the setup chunk. This means that **the file will knit EVEN if there are errors**! This will ensure you always have an HTML file to submit, but remember to ***CHECK YOUR FILE FOR ERRORS BEFORE YOU SUBMIT!!*** You can turn this off if you like, but it seems to help most people.
+
+
+
+## Question 2: Pasteurization samples
+A dairy company is researching the effectiveness of 4 different pasteurization methods for sanitizing its products to extend shelf life. Four samples each pasteurized with a different method were prepared. Then, each sample was divided into 10 subsamples. 5 labs from the nearby area were randomly chosen and 2 subsamples from each method were sent to each lab to be analyzed. The number of microorganisms reported by each lab for each sample is shown below:
+
+<center><div style="width:40%">
+|           | sample 1 | sample 2 | sample 3 | sample 4 |
+|:---------:|:--------:|:--------:|:--------:|:--------:|
+| **lab 1** | 220      | 300      | 210      | 270      |
+|           | 210      | 290      | 200      | 260      |
+| **lab 2** | 260      | 360      | 290      | 360      |
+|           | 250      | 350      | 240      | 380      |
+| **lab 3** | 190      | 250      | 160      | 230      |
+|           | 210      | 220      | 200      | 230      |
+| **lab 4** | 260      | 280      | 330      | 350      |
+|           | 430      | 180      | 340      | 290      |
+| **lab 5** | 400      | 480      | 370      | 500      |
+|           | 390      | 480      | 340      | 480      |
+</div></center>
+
+```{r}
+# for your convenience, the data import code has been done for you below
+dairy = data.frame(
+  lab = rep(1:5,times=rep(8,5)),
+  samp = rep(1:4,length.out=40),
+  value = c(220,300,210,270, 210,290,200,260,
+            260,360,290,360, 250,350,240,380,
+            190,250,160,230, 210,220,200,230,
+            260,280,330,350, 430,180,340,290,
+            400,480,370,500, 390,480,340,480))
+head(dairy)
+```
+
+
+
+### Part I <small>(pts: 1, 3, 1, 1)</small>
+First, for each sample, combine all the observations from the different labs and treat them as a single group (i.e. **ignore which lab reported which values**).
+```{r}
+dairy_new = dairy %>% 
+   group_by(samp) %>%
+   select(samp, value) %>% 
+   pivot_wider(names_from = samp, values_from = value) %>% 
+   ungroup()
+
+dairy_new = unnest(dairy_new, cols = c("1", "2", "3", "4"))
+dairy_new
+```
+
+a. Make boxplots comparing the median and spread of each group. **Comment on the plot**.
+```{r}
+boxplot(dairy$value ~ dairy$samp)
+```
+
+b. Construct an ANOVA table by hand (i.e. using basic R functions) to test if there are any significant differences in the mean microorganism count after applying each pasteurization method. **Report a p-value and write a conclusion** interpreting the results in the context of the original question.
+   Note: you may use the following table as a template.
+   <center><div style="width:50%">
+   | Source     |  SS       |  df  |  MS      |  F_obs   |  p-value   |
+   |------------|----------:|-----:|---------:|:--------:|:----------:|
+   | _________  | _________ | ____ | ________ | ________ | __________ |
+   | _________  | _________ | ____ | ________ |          |            |
+   | Total      | _________ | ____ |          |          |            |
+   </div></center>
+```{r}
+comp = dairy %>% 
+   group_by(samp) %>% 
+   mutate(fit = mean(value)) %>% 
+   mutate(error = fit - value) %>% 
+   mutate(sq_error = error^2) %>% 
+   ungroup()
+
+comp = comp %>% 
+   summarize(n = n(), sse = sum(sq_error)) %>% 
+   mutate(p = length(unique(dairy$samp))) %>% 
+   mutate(df = n - p) %>% 
+   select(sse, df, n, p) %>% 
+   mutate(mse = sse/df)
+
+reduc = dairy %>% 
+   mutate(fit = mean(value)) %>% 
+   mutate(error = fit - value) %>% 
+   mutate(sq_error = error^2) %>% 
+   ungroup()
+
+reduc = reduc %>% 
+   summarize(n = n(), sse = sum(sq_error)) %>% 
+   mutate(p = 1) %>% 
+   mutate(df = n - p) %>% 
+   select(sse, df, n, p)
+
+
+explained_sse = reduc$sse - comp$sse
+explained_df = reduc$df - comp$df
+explained_mse = explained_sse / explained_df
+fobs = (explained_mse/comp$mse)
+
+pf(fobs, explained_df, comp$df, lower.tail = FALSE)
+```
+Concl: 
+the p-value is 0.332, so not significant.
+So we cannot reject the null hypothesis, and the samples collected are not different.
+ 
+c. If necessary, do post-hoc analysis.
+Since our p-value is not statistically significant this is not necessary.
+
+d. Run model diagnostics to check if assumptions are satisfied.
+```{r}
+dairy.long = dairy_new %>% 
+   pivot_longer(1:4, "samp", values_to = "value")
+
+aov.dairy = aov(value ~ samp, data=dairy.long)
+summary(aov.dairy)
+```
+
+
+### Part II <small>(pts: 3, 1, 1, 1)</small>
+Now, we're going to use a different approach to take into account the different labs. Specifically, suppose we want to find if the labs are consistent with each other or not. Since the subsamples were derived from the same initial sample, it shouldn't matter which specific lab the results were sent to, and they should each report similar values.
+(*Hint: remember the labs were randomly sampled from a population of labs in the area.*)
+
+a. Compute a 90% confidence interval for the **standard deviation between lab means**.
+```{r}
+p2_dairy = dairy %>% 
+   group_by(lab) %>% 
+   mutate(mean(value))
+
+mean_dairy = dairy %>%
+   summarize(lab, mean(value))
+mean_dairy
+
+ci= quantile(p2_dairy$value, probs=c(0.05, 0.95))
+ci
+```
+b. Does your data support the conclusion that the labs are consistent? **Explain why or why not**.
+
+c. What proportion of the overall variance can be attributed to the lab-to-lab variation? What proportions is attributed to random error?
+
+d. Run model diagnostics to check if assumptions are satisfied.
+
+

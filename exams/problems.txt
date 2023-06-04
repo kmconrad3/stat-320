@@ -1,0 +1,15 @@
+Practice problems from ISLR
+
+https://hastie.su.domains/ISLR2/ISLRv2_website.pdf
+
+3.7:  12, 13, 15
+4.8:  9, 13abcd, 14abcf, 16
+5.4:  2, 3, 5, 6, 8
+6.6:  3ab, 4ab, 9abcd, 10abcdef
+13.7: 5, 6, 7abc
+There are no ANOVA exercises in ISLR, but here is a page with some exercises you can do (not everything on this page we have covered, if you haven't seen it in lecture, it won't be tested). Feel free to find more exercises online.
+ - https://www.sjsu.edu/faculty/gerstman/StatPrimer/anova-b-exercises.htm
+There are also no random effects exercises in ISLR, the first example (GPA example) from this link should be a good practice (the sleep example is NOT something we have covered). Feel free to find more exercises online.
+ - https://m-clark.github.io/mixed-models-with-R/random_intercepts.html
+
+Sorry there aren't as many good practice examples for some of these later, advanced topics. I will find some textbooks covering this materials and add more in the next few days.
